@@ -15,6 +15,7 @@ function App() {
   const [savedPosts, setSavedPosts] = useState([]);
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
   const [profile, setProfile] = useState({
     username: '',
     display_name: '',
@@ -128,23 +129,33 @@ function App() {
   };
 
   const handleProfileUpdate = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     console.log("Saving profile...", editingProfile);
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        username: editingProfile.username,
-        display_name: editingProfile.display_name,
-        bio: editingProfile.bio
-      })
-      .eq('id', user.id);
+    setSavingProfile(true);
+    
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          username: editingProfile.username,
+          display_name: editingProfile.display_name,
+          bio: editingProfile.bio
+        })
+        .eq('id', user.id);
 
-    if (!error) {
-      console.log("Profile saved successfully");
-      setProfile({ ...profile, ...editingProfile });
-      setShowProfileEdit(false);
-    } else {
-      console.error("Profile save failed:", error);
+      if (!error) {
+        console.log("Profile saved successfully");
+        setProfile({ ...profile, ...editingProfile });
+        setShowProfileEdit(false);
+      } else {
+        console.error("Profile save failed:", error);
+        alert("Failed to save profile: " + error.message);
+      }
+    } catch (err) {
+      console.error("Profile save error:", err);
+      alert("An unexpected error occurred while saving");
+    } finally {
+      setSavingProfile(false);
     }
   };
 
@@ -655,9 +666,15 @@ function App() {
                         <button
                           type="button"
                           onClick={handleProfileUpdate}
-                          className="px-6 py-2 bg-gradient-to-r from-pink-400 to-pink-500 text-white rounded-full font-bold border-4 border-white shadow-lg hover:shadow-xl transition-shadow"
+                          disabled={savingProfile}
+                          className={`px-6 py-2 rounded-full font-bold border-4 border-white shadow-lg hover:shadow-xl transition-shadow ${
+                            savingProfile
+                              ? 'bg-gray-400 text-white cursor-not-allowed'
+                              : 'bg-gradient-to-r from-pink-400 to-pink-500 text-white'
+                          }`}
                         >
-                          <Save size={20} className="inline mr-2" /> Save
+                          <Save size={20} className="inline mr-2" />
+                          {savingProfile ? 'Saving...' : 'Save'}
                         </button>
                       </div>
                     </form>
