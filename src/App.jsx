@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Camera, Users, User, Edit2, Save, X, Star } from 'lucide-react';
+import { Camera, Users, User, Edit2, Save, X, Star, Menu } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import MoodBubble from './components/MoodBubble';
 import HeartSaveButton from './components/HeartSaveButton';
@@ -14,6 +14,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('post');
   const [savedPosts, setSavedPosts] = useState([]);
   const [showProfileEdit, setShowProfileEdit] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [profile, setProfile] = useState({
     username: '',
     display_name: '',
@@ -320,12 +321,88 @@ function App() {
 
       {/* Main Content */}
       <div className="relative z-10 flex min-h-screen">
-        {/* Sidebar */}
+        {/* Mobile Hamburger Menu Button */}
+        <div className="lg:hidden fixed top-4 right-4 z-50">
+          <button
+            onClick={() => setShowMobileMenu(!showMobileMenu)}
+            className="p-3 bg-white/90 backdrop-blur-md rounded-full border-4 border-pink-300 shadow-lg hover:shadow-xl transition-all"
+            style={{ boxShadow: '0 0 10px #ff69b4' }}
+          >
+            <Menu size={28} className="text-pink-600" />
+          </button>
+        </div>
+
+        {/* Mobile Slide-out Menu */}
+        <AnimatePresence>
+          {showMobileMenu && (
+            <>
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+                onClick={() => setShowMobileMenu(false)}
+              />
+              {/* Menu Panel */}
+              <motion.div
+                initial={{ x: '-100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '-100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                className="fixed top-0 left-0 h-full w-80 bg-lavender/90 backdrop-blur-md z-50 lg:hidden flex flex-col items-center gap-6 p-6 pt-20"
+                style={{ backgroundColor: 'rgba(230, 230, 250, 0.95)' }}
+              >
+                {/* Logo */}
+                <div className="mb-4">
+                  <div className="w-20 h-20 rounded-full border-4 border-pink-500 shadow-lg flex items-center justify-center" style={{
+                    boxShadow: '0 0 10px #ff69b4, 0 0 20px #ff69b4, 0 0 30px #ff69b4, 0 0 40px #ff69b4'
+                  }}>
+                    <span className="text-3xl">🐺</span>
+                  </div>
+                </div>
+
+                {/* Navigation Buttons */}
+                {sidebarButtons.map((btn) => {
+                  const Icon = btn.icon;
+                  const isActive = activeTab === btn.id;
+                  return (
+                    <motion.button
+                      key={btn.id}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => {
+                        setActiveTab(btn.id);
+                        setShowMobileMenu(false);
+                      }}
+                      className={`w-full py-4 px-6 rounded-full font-bold text-lg transition-all border-4 ${
+                        isActive
+                          ? 'bg-gradient-to-r from-pink-300 to-pink-400 border-white shadow-lg scale-105'
+                          : 'bg-white/60 border-pink-200 hover:bg-pink-100'
+                      }`}
+                      style={{
+                        boxShadow: '0 4px 15px rgba(236, 72, 153, 0.2)',
+                        fontFamily: "'Cherry Bomb One', cursive"
+                      }}
+                    >
+                      <div className="flex items-center justify-center gap-3">
+                        <Icon size={24} />
+                        <span>{btn.emoji} {btn.label}</span>
+                      </div>
+                    </motion.button>
+                  );
+                })}
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
+        {/* Desktop Sidebar */}
         <motion.div
           initial={{ x: -100, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ duration: 0.5 }}
-          className="flex flex-col items-center gap-6 p-6 w-64 bg-white/80 backdrop-blur-md border-r-4 border-white shadow-xl"
+          className="hidden lg:flex flex-col items-center gap-6 p-6 w-64 bg-white/80 backdrop-blur-md border-r-4 border-white shadow-xl"
         >
           {/* Logo */}
           <div className="mb-8">
