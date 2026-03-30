@@ -1,0 +1,23 @@
+{
+  "name": "She-Wolf Pack",
+  "short_name": "SheWolf",
+  "description": "Our own private place to embarrass ourselves",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fce7f3",
+  "theme_color": "#ec4899",
+  "icons": [
+    {
+      "src": "/assets/image_6.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/image_6.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
