@@ -51,29 +51,50 @@ function App() {
   }, []);
 
   const fetchProfile = async () => {
-    console.log("Fetching profile for user:", user.id);
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-
-    if (error) {
-      console.error("Error fetching profile:", error);
+    console.log("=== fetchProfile called ===");
+    console.log("User object:", user);
+    console.log("User ID:", user?.id);
+    
+    if (!user?.id) {
+      console.error("No user ID available, cannot fetch profile");
       return;
     }
 
-    if (data) {
-      console.log("Profile data received:", data);
-      setProfile(data);
-      setEditingProfile({
-        username: data.username || '',
-        display_name: data.display_name || '',
-        bio: data.bio || ''
-      });
-    } else {
-      console.warn("No profile data found for user:", user.id);
+    try {
+      const { data, error, status } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      console.log("Profile query status:", status);
+      console.log("Profile query error:", error);
+      console.log("Profile query data:", data);
+
+      if (error) {
+        console.error("Error fetching profile:", error);
+        if (error.code === 'PGRST116') {
+          console.warn("No profile record exists for this user. They may need to sign up or update their profile.");
+        }
+        return;
+      }
+
+      if (data) {
+        console.log("✅ Profile data received successfully:", data);
+        setProfile(data);
+        setEditingProfile({
+          username: data.username || '',
+          display_name: data.display_name || '',
+          bio: data.bio || ''
+        });
+        console.log("Profile state updated");
+      } else {
+        console.warn("No profile data found (empty response)");
+      }
+    } catch (err) {
+      console.error("Exception in fetchProfile:", err);
     }
+    console.log("=== fetchProfile completed ===");
   };
 
   const fetchPosts = async () => {
@@ -130,13 +151,27 @@ function App() {
 
   // Fetch user profile and related data when user changes
   useEffect(() => {
-    if (user) {
-      console.log("User changed, fetching data...", user.id);
+    console.log("=== useEffect triggered ===");
+    console.log("User object in useEffect:", user);
+    console.log("User ID in useEffect:", user?.id);
+    
+    if (user?.id) {
+      console.log("User exists, calling fetchProfile...");
       fetchProfile();
       fetchPosts();
       fetchFriends();
+    } else {
+      console.log("No user, skipping data fetch");
     }
   }, [user?.id]);
+
+  // Also try to fetch profile if it's empty but we have a user (fallback)
+  useEffect(() => {
+    if (user?.id && (!profile.username && !profile.display_name && !profile.bio)) {
+      console.log("Profile is empty but user exists, attempting fetch...");
+      fetchProfile();
+    }
+  }, [user?.id, profile.username, profile.display_name, profile.bio]);
 
   const handleProfileUpdate = async (e) => {
     if (e) e.preventDefault();
