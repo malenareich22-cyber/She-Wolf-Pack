@@ -52,14 +52,17 @@ function App() {
 
   const fetchProfile = async () => {
     console.log("=== fetchProfile called ===");
-    console.log("User object:", user);
-    console.log("User ID:", user?.id);
     
-    if (!user?.id) {
-      console.error("No user ID available, cannot fetch profile");
+    // Get current user from Supabase auth
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      console.error("No user authenticated, cannot fetch profile", authError);
       return;
     }
-
+    
+    console.log("User ID from getUser():", user.id);
+    
     try {
       const { data, error, status } = await supabase
         .from('profiles')
@@ -87,6 +90,7 @@ function App() {
           display_name: data.display_name || '',
           bio: data.bio || ''
         });
+        console.log("Profile loaded successfully");
         console.log("Profile state updated");
       } else {
         console.warn("No profile data found (empty response)");
@@ -165,13 +169,6 @@ function App() {
     }
   }, [user?.id]);
 
-  // Also try to fetch profile if it's empty but we have a user (fallback)
-  useEffect(() => {
-    if (user?.id && (!profile.username && !profile.display_name && !profile.bio)) {
-      console.log("Profile is empty but user exists, attempting fetch...");
-      fetchProfile();
-    }
-  }, [user?.id, profile.username, profile.display_name, profile.bio]);
 
   const handleProfileUpdate = async (e) => {
     if (e) e.preventDefault();
