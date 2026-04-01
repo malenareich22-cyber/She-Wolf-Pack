@@ -281,24 +281,67 @@ function App() {
     const file = e.target.files[0];
     if (!file) return;
 
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+    try {
+      // Get authenticated user
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+      if (authError || !authUser) {
+        alert("Not authenticated! Please sign in again.");
+        return;
+      }
 
-    const { error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(fileName, file);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${authUser.id}-${Date.now()}.${fileExt}`;
 
-    if (!uploadError) {
+      console.log("Uploading avatar to:", fileName);
+      
+      // Upload to avatars bucket
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadError) {
+        console.error("Upload error:", uploadError);
+        alert("Failed to upload avatar: " + uploadError.message);
+        return;
+      }
+
+      console.log("Upload successful, getting public URL...");
+      
+      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
         .getPublicUrl(fileName);
 
-      await supabase
+      console.log("Public URL:", publicUrl);
+
+      // Update profile with avatar URL
+      const { error: updateError } = await supabase
         .from('profiles')
         .update({ avatar_url: publicUrl })
-        .eq('id', user.id);
+        .eq('id', authUser.id);
 
+      if (updateError) {
+        console.error("Profile update error:", updateError);
+        alert("Failed to update profile with avatar: " + updateError.message);
+        return;
+      }
+
+      console.log("Profile updated with avatar URL");
+      
+      // Update local state immediately
       setProfile({ ...profile, avatar_url: publicUrl });
+      
+      // Update localStorage backup
+      const updatedProfile = { ...profile, avatar_url: publicUrl };
+      localStorage.setItem('profile_backup', JSON.stringify(updatedProfile));
+      
+      alert("Avatar uploaded successfully!");
+    } catch (err) {
+      console.error("Avatar upload exception:", err);
+      alert("An unexpected error occurred while uploading avatar: " + err.message);
     }
   };
 
@@ -306,26 +349,67 @@ function App() {
     const file = e.target.files[0];
     if (!file) return;
 
-    const fileExt = file.name.split('.').pop();
-    const fileName = `background-${user.id}-${Date.now()}.${fileExt}`;
+    try {
+      // Get authenticated user
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+      if (authError || !authUser) {
+        alert("Not authenticated! Please sign in again.");
+        return;
+      }
 
-    const { error: uploadError } = await supabase.storage
-      .from('backgrounds')
-      .upload(fileName, file);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `background-${authUser.id}-${Date.now()}.${fileExt}`;
 
-    if (!uploadError) {
+      console.log("Uploading background to:", fileName);
+      
+      // Upload to backgrounds bucket
+      const { error: uploadError } = await supabase.storage
+        .from('backgrounds')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadError) {
+        console.error("Background upload error:", uploadError);
+        alert("Failed to upload background: " + uploadError.message);
+        return;
+      }
+
+      console.log("Background upload successful, getting public URL...");
+      
+      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('backgrounds')
         .getPublicUrl(fileName);
 
-      await supabase
+      console.log("Public URL:", publicUrl);
+
+      // Update profile with background URL
+      const { error: updateError } = await supabase
         .from('profiles')
         .update({ background_url: publicUrl })
-        .eq('id', user.id);
+        .eq('id', authUser.id);
 
+      if (updateError) {
+        console.error("Profile update error:", updateError);
+        alert("Failed to update profile with background: " + updateError.message);
+        return;
+      }
+
+      console.log("Profile updated with background URL");
+      
+      // Update local state immediately
       setProfile({ ...profile, background_url: publicUrl });
-    } else {
-      console.error('Background upload failed:', uploadError);
+      
+      // Update localStorage backup
+      const updatedProfile = { ...profile, background_url: publicUrl };
+      localStorage.setItem('profile_backup', JSON.stringify(updatedProfile));
+      
+      alert("Background uploaded successfully!");
+    } catch (err) {
+      console.error("Background upload exception:", err);
+      alert("An unexpected error occurred while uploading background: " + err.message);
     }
   };
 
