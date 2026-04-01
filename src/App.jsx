@@ -208,42 +208,72 @@ function App() {
 
   const handleProfileUpdate = async (e) => {
     if (e) e.preventDefault();
+    console.log("=== handleProfileUpdate called ===");
     console.log("Saving profile...", editingProfile);
     setSavingProfile(true);
     
     try {
+      // First, verify we have an authenticated user
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !authUser) {
+        console.error("Authentication error:", authError);
+        console.error("Auth error details:", authError?.details, authError?.code);
+        alert("Not authenticated! Please sign in again.");
+        setSavingProfile(false);
+        return;
+      }
+      
+      console.log("Authenticated user ID:", authUser.id);
+      console.log("Auth user email:", authUser.email);
+      
+      // Prepare the profile data
+      const profileData = {
+        id: authUser.id,
+        username: editingProfile.username,
+        display_name: editingProfile.display_name,
+        bio: editingProfile.bio,
+        updated_at: new Date().toISOString()
+      };
+      
+      console.log("Upserting profile data:", profileData);
+      
       // Use upsert to handle both insert and update
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
-        .upsert({
-          id: user.id,
-          username: editingProfile.username,
-          display_name: editingProfile.display_name,
-          bio: editingProfile.bio,
-          updated_at: new Date().toISOString()
-        });
+        .upsert(profileData, { onConflict: 'id' })
+        .select();
 
-      if (!error) {
-        console.log("Profile saved successfully");
+      console.log("Upsert response - data:", data);
+      console.log("Upsert response - error:", error);
+      
+      if (error) {
+        console.error("❌ Profile save failed:", error);
+        console.error("Error code:", error.code);
+        console.error("Error details:", error.details);
+        console.error("Error hint:", error.hint);
+        alert("Failed to save profile!\n\nError: " + error.message + "\n\nCode: " + error.code + "\n\nCheck console for details.");
+        throw error;
+      } else {
+        console.log("✅ Profile saved successfully:", data);
         alert("Profile Saved!");
         const updatedProfile = {
           ...profile,
           ...editingProfile,
-          id: user.id
+          id: authUser.id
         };
         setProfile(updatedProfile);
         // Save to localStorage as backup
         localStorage.setItem('profile_backup', JSON.stringify(updatedProfile));
         setShowProfileEdit(false);
-      } else {
-        console.error("Profile save failed:", error);
-        alert("Failed to save profile: " + error.message);
       }
     } catch (err) {
-      console.error("Profile save error:", err);
-      alert("An unexpected error occurred while saving");
+      console.error("Profile save error (catch):", err);
+      console.error("Error stack:", err.stack);
+      alert("An unexpected error occurred while saving: " + (err.message || String(err)));
     } finally {
       setSavingProfile(false);
+      console.log("=== handleProfileUpdate completed ===");
     }
   };
 
