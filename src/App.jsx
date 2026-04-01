@@ -23,6 +23,7 @@ function App() {
     avatar_url: '',
     background_url: ''
   });
+  const [authReady, setAuthReady] = useState(false);
   const [posts, setPosts] = useState([]);
   const [editingProfile, setEditingProfile] = useState({
     username: '',
@@ -52,6 +53,12 @@ function App() {
 
   const fetchProfile = async () => {
     console.log("=== fetchProfile called ===");
+    
+    // Wait for auth to be ready
+    if (!authReady) {
+      console.log("Auth not ready yet, waiting...");
+      return;
+    }
     
     // Get current user from Supabase auth
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -90,6 +97,8 @@ function App() {
           display_name: data.display_name || '',
           bio: data.bio || ''
         });
+        // Save to localStorage as backup
+        localStorage.setItem('profile_backup', JSON.stringify(data));
         console.log("Profile loaded successfully");
         console.log("Profile state updated");
       } else {
@@ -153,21 +162,48 @@ function App() {
     }
   };
 
+  // Check localStorage for profile backup on mount
+  useEffect(() => {
+    const backup = localStorage.getItem('profile_backup');
+    if (backup) {
+      try {
+        const savedProfile = JSON.parse(backup);
+        console.log("Found profile in localStorage:", savedProfile);
+        setProfile(savedProfile);
+        setEditingProfile({
+          username: savedProfile.username || '',
+          display_name: savedProfile.display_name || '',
+          bio: savedProfile.bio || ''
+        });
+      } catch (e) {
+        console.error("Failed to parse localStorage profile:", e);
+      }
+    }
+  }, []);
+
+  // Set auth ready flag when user from context is available
+  useEffect(() => {
+    if (user !== undefined) {
+      setAuthReady(true);
+    }
+  }, [user]);
+
   // Fetch user profile and related data when user changes
   useEffect(() => {
     console.log("=== useEffect triggered ===");
     console.log("User object in useEffect:", user);
     console.log("User ID in useEffect:", user?.id);
+    console.log("Auth ready:", authReady);
     
-    if (user?.id) {
-      console.log("User exists, calling fetchProfile...");
+    if (user?.id && authReady) {
+      console.log("User exists and auth ready, calling fetchProfile...");
       fetchProfile();
       fetchPosts();
       fetchFriends();
     } else {
-      console.log("No user, skipping data fetch");
+      console.log("No user or auth not ready, skipping data fetch");
     }
-  }, [user?.id]);
+  }, [user?.id, authReady]);
 
 
   const handleProfileUpdate = async (e) => {
@@ -176,18 +212,28 @@ function App() {
     setSavingProfile(true);
     
     try {
+      // Use upsert to handle both insert and update
       const { error } = await supabase
         .from('profiles')
-        .update({
+        .upsert({
+          id: user.id,
           username: editingProfile.username,
           display_name: editingProfile.display_name,
-          bio: editingProfile.bio
-        })
-        .eq('id', user.id);
+          bio: editingProfile.bio,
+          updated_at: new Date().toISOString()
+        });
 
       if (!error) {
         console.log("Profile saved successfully");
-        setProfile({ ...profile, ...editingProfile });
+        alert("Profile Saved!");
+        const updatedProfile = {
+          ...profile,
+          ...editingProfile,
+          id: user.id
+        };
+        setProfile(updatedProfile);
+        // Save to localStorage as backup
+        localStorage.setItem('profile_backup', JSON.stringify(updatedProfile));
         setShowProfileEdit(false);
       } else {
         console.error("Profile save failed:", error);
