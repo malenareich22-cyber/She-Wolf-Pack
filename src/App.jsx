@@ -50,15 +50,6 @@ function App() {
     }));
   }, []);
 
-  // Fetch user profile
-  useEffect(() => {
-    if (user) {
-      fetchProfile();
-      fetchPosts();
-      fetchFriends();
-    }
-  }, [user]);
-
   const fetchProfile = async () => {
     const { data, error } = await supabase
       .from('profiles')
@@ -127,6 +118,15 @@ function App() {
       setFriends(data);
     }
   };
+
+  // Fetch user profile
+  useEffect(() => {
+    if (user) {
+      fetchProfile();
+      fetchPosts();
+      fetchFriends();
+    }
+  }, [user]);
 
   const handleProfileUpdate = async (e) => {
     if (e) e.preventDefault();
@@ -702,9 +702,6 @@ function App() {
                       {profile.display_name || profile.username || 'My Profile'}
                     </h2>
                     <p className="text-xl text-pink-700 mb-4">@{profile.username}</p>
-                    {profile.display_name && (
-                      <p className="text-2xl text-pink-600 font-bold mb-4">{profile.display_name}</p>
-                    )}
                     <p className="text-lg text-gray-700 mb-6">{profile.bio || 'No bio yet... add one!'}</p>
                     <div className="flex gap-3 justify-center">
                       <button
