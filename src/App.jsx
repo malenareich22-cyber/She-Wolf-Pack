@@ -51,19 +51,28 @@ function App() {
   }, []);
 
   const fetchProfile = async () => {
+    console.log("Fetching profile for user:", user.id);
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', user.id)
       .single();
 
+    if (error) {
+      console.error("Error fetching profile:", error);
+      return;
+    }
+
     if (data) {
+      console.log("Profile data received:", data);
       setProfile(data);
       setEditingProfile({
         username: data.username || '',
         display_name: data.display_name || '',
         bio: data.bio || ''
       });
+    } else {
+      console.warn("No profile data found for user:", user.id);
     }
   };
 
@@ -119,14 +128,15 @@ function App() {
     }
   };
 
-  // Fetch user profile
+  // Fetch user profile and related data when user changes
   useEffect(() => {
     if (user) {
+      console.log("User changed, fetching data...", user.id);
       fetchProfile();
       fetchPosts();
       fetchFriends();
     }
-  }, [user]);
+  }, [user?.id]);
 
   const handleProfileUpdate = async (e) => {
     if (e) e.preventDefault();
@@ -212,21 +222,32 @@ function App() {
   };
 
   const handleCreatePost = async (postData) => {
+    console.log("Creating post with data:", postData);
     const { content, mood, image_url, video_url } = postData;
+
+    if (!content.trim() && !image_url && !video_url) {
+      console.log("Post has no content, skipping");
+      return;
+    }
 
     const { error } = await supabase
       .from('posts')
       .insert({
         user_id: user.id,
-        content,
-        mood,
-        image_url,
-        video_url
+        content: content || '',
+        mood: mood || '',
+        image_url: image_url || null,
+        video_url: video_url || null
       });
 
-    if (!error) {
-      fetchPosts();
+    if (error) {
+      console.error("Error creating post:", error);
+      alert("Failed to create post: " + error.message);
+      return;
     }
+
+    console.log("Post created successfully");
+    fetchPosts();
   };
 
   const toggleSave = async (postId) => {
