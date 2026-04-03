@@ -429,12 +429,12 @@ function App() {
   const handleCreatePost = async (postData) => {
     const { content, mood, imageFile, videoFile } = postData;
 
-    // Get current user
-    const { data: { user } } = await supabase.auth.getUser();
+    // Get current user explicitly
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
     
-    if (!user) {
-      alert("User not found");
-      return;
+    if (!user) { 
+      alert('Error: You must be logged in to post. User ID not found.'); 
+      return; 
     }
 
     // Set saving state to prevent duplicates
