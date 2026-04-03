@@ -111,19 +111,26 @@ function App() {
   };
 
   const fetchPosts = async () => {
+    // Get current authenticated user
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+    if (authError || !authUser) {
+      console.error("No authenticated user for fetchPosts");
+      return;
+    }
+
     // Get accepted friendships
     const { data: friendships } = await supabase
       .from('friendships')
       .select('friend_id')
-      .eq('user_id', user.id)
+      .eq('user_id', authUser.id)
       .eq('status', 'accepted');
 
     const friendIds = friendships?.map(f => f.friend_id) || [];
 
     // Also include own posts
-    const allUserIds = [...friendIds, user.id];
+    const allUserIds = [...friendIds, authUser.id];
 
-    // Get posts from self and accepted friends, ordered by creation (oldest first)
+    // Get posts from self and accepted friends, ordered by creation (newest first)
     const { data: postsData, error } = await supabase
       .from('posts')
       .select(`
@@ -135,7 +142,7 @@ function App() {
         )
       `)
       .in('user_id', allUserIds)
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: false });
 
     if (postsData) {
       setPosts(postsData);
@@ -143,6 +150,12 @@ function App() {
   };
 
   const fetchFriends = async () => {
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+    if (authError || !authUser) {
+      console.error("No authenticated user for fetchFriends");
+      return;
+    }
+
     const { data } = await supabase
       .from('friendships')
       .select(`
@@ -154,7 +167,7 @@ function App() {
           status
         )
       `)
-      .eq('user_id', user.id)
+      .eq('user_id', authUser.id)
       .eq('status', 'accepted');
 
     if (data) {
@@ -204,7 +217,6 @@ function App() {
       console.log("No user or auth not ready, skipping data fetch");
     }
   }, [user?.id, authReady]);
-
 
   const handleProfileUpdate = async (e) => {
     if (e) e.preventDefault();
@@ -415,38 +427,123 @@ function App() {
 
   const handleCreatePost = async (postData) => {
     console.log("Creating post with data:", postData);
-    const { content, mood, image_url, video_url } = postData;
+    const { content, mood, imageFile, videoFile } = postData;
 
-    if (!content.trim() && !image_url && !video_url) {
+    if (!content.trim() && !imageFile && !videoFile) {
       console.log("Post has no content, skipping");
       return;
     }
 
-    const { error } = await supabase
-      .from('posts')
-      .insert({
-        user_id: user.id,
-        content: content || '',
-        mood: mood || '',
-        image_url: image_url || null,
-        video_url: video_url || null
-      });
+    try {
+      // Get current authenticated user FIRST
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        alert("You must be logged in to post");
+        return;
+      }
 
-    if (error) {
-      console.error("Error creating post:", error);
-      alert("Failed to create post: " + error.message);
-      return;
+      console.log("Creating post for user ID:", user.id);
+
+      let imageUrl = null;
+      let videoUrl = null;
+
+      // Upload image if provided
+      if (imageFile) {
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = `post-${user.id}-${Date.now()}.${fileExt}`;
+        
+        console.log("Uploading image to posts bucket:", fileName);
+        
+        const { error: uploadError } = await supabase.storage
+          .from('posts')
+          .upload(fileName, imageFile, {
+            cacheControl: '3600',
+            upsert: true
+          });
+
+        if (uploadError) {
+          console.error("Image upload error:", uploadError);
+          alert("Failed to upload image: " + uploadError.message);
+          return;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('posts')
+          .getPublicUrl(fileName);
+        
+        imageUrl = publicUrl;
+        console.log("Image uploaded successfully:", imageUrl);
+      }
+
+      // Upload video if provided
+      if (videoFile) {
+        const fileExt = videoFile.name.split('.').pop();
+        const fileName = `post-${user.id}-${Date.now()}.${fileExt}`;
+        
+        console.log("Uploading video to posts bucket:", fileName);
+        
+        const { error: uploadError } = await supabase.storage
+          .from('posts')
+          .upload(fileName, videoFile, {
+            cacheControl: '3600',
+            upsert: true
+          });
+
+        if (uploadError) {
+          console.error("Video upload error:", uploadError);
+          alert("Failed to upload video: " + uploadError.message);
+          return;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('posts')
+          .getPublicUrl(fileName);
+        
+        videoUrl = publicUrl;
+        console.log("Video uploaded successfully:", videoUrl);
+      }
+
+      // Insert post record with media URLs and CORRECT user_id
+      const { error } = await supabase
+        .from('posts')
+        .insert({
+          user_id: user.id,
+          content: content || '',
+          mood: mood || '',
+          image_url: imageUrl,
+          video_url: videoUrl
+        });
+
+      if (error) {
+        console.error("Error creating post:", error);
+        alert("Failed to create post: " + error.message);
+        return;
+      }
+
+      console.log("✅ Post created successfully with user_id:", user.id);
+      
+      // Refresh feed - newest posts first
+      await fetchPosts();
+      
+      // Clear the form is handled by PostCreator
+    } catch (err) {
+      console.error("Post creation exception:", err);
+      alert("An unexpected error occurred: " + err.message);
     }
-
-    console.log("Post created successfully");
-    fetchPosts();
   };
 
   const toggleSave = async (postId) => {
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+    if (authError || !authUser) {
+      alert("Not authenticated!");
+      return;
+    }
+
     const { data: existing } = await supabase
       .from('saved_posts')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', authUser.id)
       .eq('post_id', postId)
       .single();
 
@@ -454,13 +551,13 @@ function App() {
       await supabase
         .from('saved_posts')
         .delete()
-        .eq('user_id', user.id)
+        .eq('user_id', authUser.id)
         .eq('post_id', postId);
       setSavedPosts(prev => prev.filter(id => id !== postId));
     } else {
       await supabase
         .from('saved_posts')
-        .insert({ user_id: user.id, post_id: postId });
+        .insert({ user_id: authUser.id, post_id: postId });
       setSavedPosts(prev => [...prev, postId]);
     }
   };
