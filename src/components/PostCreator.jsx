@@ -2,13 +2,14 @@ import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Camera, Video, Heart, X } from 'lucide-react';
 
-const PostCreator = ({ onSubmit, currentUser }) => {
+const PostCreator = ({ onSubmit, currentUser, savingPost }) => {
   const [feelings, setFeelings] = useState('');
   const [selectedMood, setSelectedMood] = useState('');
   const [imageFile, setImageFile] = useState(null);
   const [videoFile, setVideoFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [videoPreview, setVideoPreview] = useState(null);
+  const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
   const videoInputRef = useRef(null);
 
@@ -55,12 +56,14 @@ const PostCreator = ({ onSubmit, currentUser }) => {
 
   const handleSubmit = async () => {
     if (!feelings.trim() && !imageFile && !videoFile) return;
+    if (savingPost) return; // Prevent multiple submissions
 
+    // Pass File objects to parent, not preview URLs
     const postData = {
       content: feelings,
       mood: selectedMood,
-      image_url: imagePreview,
-      video_url: videoPreview
+      imageFile: imageFile,
+      videoFile: videoFile
     };
 
     await onSubmit(postData);
@@ -188,12 +191,12 @@ const PostCreator = ({ onSubmit, currentUser }) => {
         {/* Submit Button */}
         <button
           onClick={handleSubmit}
-          disabled={!feelings.trim() && !imageFile && !videoFile}
+          disabled={(!feelings.trim() && !imageFile && !videoFile) || savingPost}
           className="w-full py-4 bg-gradient-to-r from-pink-400 to-pink-500 text-white rounded-full font-bold text-xl border-4 border-white shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
           style={{ fontFamily: "'Cherry Bomb One', cursive" }}
         >
           <Heart fill="white" stroke="white" size={28} />
-          Post to the Pack 🌸
+          {savingPost ? 'Posting...' : 'Post to the Pack 🌸'}
         </button>
       </div>
     </motion.div>

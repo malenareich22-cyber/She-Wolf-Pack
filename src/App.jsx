@@ -16,6 +16,7 @@ function App() {
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [savingPost, setSavingPost] = useState(false);
   const [profile, setProfile] = useState({
     username: '',
     display_name: '',
@@ -426,34 +427,25 @@ function App() {
   };
 
   const handleCreatePost = async (postData) => {
-    console.log("Creating post with data:", postData);
     const { content, mood, imageFile, videoFile } = postData;
 
-    if (!content.trim() && !imageFile && !videoFile) {
-      console.log("Post has no content, skipping");
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      alert("User not found");
       return;
     }
 
+    // Set saving state to prevent duplicates
+    setSavingPost(true);
+
     try {
-      // Get current authenticated user FIRST
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        alert("You must be logged in to post");
-        return;
-      }
-
-      console.log("Creating post for user ID:", user.id);
-
-      let imageUrl = null;
-      let videoUrl = null;
-
       // Upload image if provided
+      let imageUrl = null;
       if (imageFile) {
         const fileExt = imageFile.name.split('.').pop();
         const fileName = `post-${user.id}-${Date.now()}.${fileExt}`;
-        
-        console.log("Uploading image to posts bucket:", fileName);
         
         const { error: uploadError } = await supabase.storage
           .from('posts')
@@ -462,26 +454,20 @@ function App() {
             upsert: true
           });
 
-        if (uploadError) {
-          console.error("Image upload error:", uploadError);
-          alert("Failed to upload image: " + uploadError.message);
-          return;
-        }
+        if (uploadError) throw uploadError;
 
         const { data: { publicUrl } } = supabase.storage
           .from('posts')
           .getPublicUrl(fileName);
         
         imageUrl = publicUrl;
-        console.log("Image uploaded successfully:", imageUrl);
       }
 
       // Upload video if provided
+      let videoUrl = null;
       if (videoFile) {
         const fileExt = videoFile.name.split('.').pop();
         const fileName = `post-${user.id}-${Date.now()}.${fileExt}`;
-        
-        console.log("Uploading video to posts bucket:", fileName);
         
         const { error: uploadError } = await supabase.storage
           .from('posts')
@@ -490,46 +476,36 @@ function App() {
             upsert: true
           });
 
-        if (uploadError) {
-          console.error("Video upload error:", uploadError);
-          alert("Failed to upload video: " + uploadError.message);
-          return;
-        }
+        if (uploadError) throw uploadError;
 
         const { data: { publicUrl } } = supabase.storage
           .from('posts')
           .getPublicUrl(fileName);
         
         videoUrl = publicUrl;
-        console.log("Video uploaded successfully:", videoUrl);
       }
 
-      // Insert post record with media URLs and CORRECT user_id
+      // Insert post with explicit field mapping
       const { error } = await supabase
         .from('posts')
         .insert({
-          user_id: user.id,
-          content: content || '',
-          mood: mood || '',
+          content: content,
+          mood: mood,
           image_url: imageUrl,
-          video_url: videoUrl
+          user_id: user.id
         });
 
-      if (error) {
-        console.error("Error creating post:", error);
-        alert("Failed to create post: " + error.message);
-        return;
-      }
+      if (error) throw error;
 
-      console.log("✅ Post created successfully with user_id:", user.id);
-      
-      // Refresh feed - newest posts first
+      // Clear form state by calling the parent's reset (PostCreator handles this)
+      // Refresh the posts list
       await fetchPosts();
       
-      // Clear the form is handled by PostCreator
     } catch (err) {
-      console.error("Post creation exception:", err);
-      alert("An unexpected error occurred: " + err.message);
+      console.error("Error creating post:", err);
+      alert("Failed to create post: " + err.message);
+    } finally {
+      setSavingPost(false);
     }
   };
 
@@ -784,7 +760,7 @@ function App() {
             {activeTab === 'post' && (
               <div className="space-y-6">
                 {/* Post Creator */}
-                <PostCreator onSubmit={handleCreatePost} currentUser={profile} />
+                <PostCreator onSubmit={handleCreatePost} currentUser={profile} savingPost={savingPost} />
 
                 {/* Posts Feed */}
                 {posts.map((post) => (
