@@ -441,14 +441,14 @@ function App() {
     setSavingPost(true);
 
     try {
-      // Upload image if provided
+      // Upload image if provided (use 'avatars' bucket for all images)
       let imageUrl = null;
       if (imageFile) {
         const fileExt = imageFile.name.split('.').pop();
         const fileName = `post-${user.id}-${Date.now()}.${fileExt}`;
         
         const { error: uploadError } = await supabase.storage
-          .from('posts')
+          .from('avatars')
           .upload(fileName, imageFile, {
             cacheControl: '3600',
             upsert: true
@@ -457,20 +457,20 @@ function App() {
         if (uploadError) throw uploadError;
 
         const { data: { publicUrl } } = supabase.storage
-          .from('posts')
+          .from('avatars')
           .getPublicUrl(fileName);
         
         imageUrl = publicUrl;
       }
 
-      // Upload video if provided
+      // Upload video if provided (use 'avatars' bucket for all videos)
       let videoUrl = null;
       if (videoFile) {
         const fileExt = videoFile.name.split('.').pop();
         const fileName = `post-${user.id}-${Date.now()}.${fileExt}`;
         
         const { error: uploadError } = await supabase.storage
-          .from('posts')
+          .from('avatars')
           .upload(fileName, videoFile, {
             cacheControl: '3600',
             upsert: true
@@ -479,7 +479,7 @@ function App() {
         if (uploadError) throw uploadError;
 
         const { data: { publicUrl } } = supabase.storage
-          .from('posts')
+          .from('avatars')
           .getPublicUrl(fileName);
         
         videoUrl = publicUrl;
@@ -492,13 +492,13 @@ function App() {
           content: content,
           mood: mood,
           image_url: imageUrl,
+          video_url: videoUrl,
           user_id: user.id
         });
 
       if (error) throw error;
 
-      // Clear form state by calling the parent's reset (PostCreator handles this)
-      // Refresh the posts list
+      // Refresh the posts list immediately
       await fetchPosts();
       
     } catch (err) {
@@ -506,6 +506,33 @@ function App() {
       alert("Failed to create post: " + err.message);
     } finally {
       setSavingPost(false);
+    }
+  };
+
+  const handleDeletePost = async (postId) => {
+    if (!window.confirm('Are you sure you want to delete this post?')) return;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        alert("Not authenticated!");
+        return;
+      }
+
+      // Delete the post (RLS will ensure user can only delete their own)
+      const { error } = await supabase
+        .from('posts')
+        .delete()
+        .eq('id', postId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      // Refresh posts list
+      await fetchPosts();
+    } catch (err) {
+      console.error("Error deleting post:", err);
+      alert("Failed to delete post: " + err.message);
     }
   };
 
@@ -806,6 +833,16 @@ function App() {
                         <p className="text-sm text-gray-400 mb-3">
                           {new Date(post.created_at).toLocaleDateString()}
                         </p>
+
+                        {/* Delete button for post owner */}
+                        {post.user_id === user?.id && (
+                          <button
+                            onClick={() => handleDeletePost(post.id)}
+                            className="text-red-500 font-bold text-sm hover:underline mr-4"
+                          >
+                            Delete
+                          </button>
+                        )}
 
                         {/* Comments Section Toggle */}
                         <button

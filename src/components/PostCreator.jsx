@@ -66,10 +66,16 @@ const PostCreator = ({ onSubmit, currentUser, savingPost }) => {
       videoFile: videoFile
     };
 
-    await onSubmit(postData);
-    setFeelings('');
-    setSelectedMood('');
-    clearMedia();
+    try {
+      await onSubmit(postData);
+      // Only clear form on success
+      setFeelings('');
+      setSelectedMood('');
+      clearMedia();
+    } catch (error) {
+      // Don't clear form on error - let user retry
+      console.error("Post submission failed:", error);
+    }
   };
 
   return (
